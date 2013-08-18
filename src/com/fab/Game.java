@@ -21,6 +21,7 @@ import com.badlogic.gdx.physics.box2d.joints.MouseJointDef;
 import com.badlogic.gdx.utils.TimeUtils;
 import com.badlogic.gdx.physics.box2d.*;
 import com.badlogic.gdx.math.*;
+import com.badlogic.gdx.utils.*;
 
 /** Base class for all Box2D Testbed tests, all subclasses must implement the createWorld() method.
  * 
@@ -34,11 +35,29 @@ public class Game implements ApplicationListener {
 	BitmapFont font;
 
 	private World world;
+	private Body ground;
+	private Body ball;
+	private Array<Body> players = new Array<Body>();
+	
   String debugMsg = "";
 
 
 	@Override
 	public void render () {
+		
+		float acc = 1000f;
+		float maxvel = 5f;
+		Vector2 ballPos = ball.getPosition();
+		for (Body player: players) {
+			Vector2 playerPos = player.getPosition();
+			Vector2 delta = ballPos.sub(playerPos).clamp(acc, acc);
+			player.applyForceToCenter(delta, true);
+			Vector2 vel = player.getLinearVelocity();
+			if (vel.len() > maxvel) {
+				player.setLinearVelocity(vel.nor().scl(maxvel));
+			}
+		}
+		
 		// update the world with a fixed time step 
 		long startTime = TimeUtils.nanoTime();
 		world.step(Gdx.app.getGraphics().getDeltaTime(), 3, 3);
@@ -61,7 +80,6 @@ public class Game implements ApplicationListener {
 	@Override
 	public void create () {
 
-
 		// create the debug renderer
 		renderer = new Box2DDebugRenderer();
 
@@ -75,10 +93,11 @@ public class Game implements ApplicationListener {
 	
   void createWorld (World world) {
 		world.setGravity(new Vector2(0, 0));
-		Body ground;
 		
-		float gw = 35;
-		float gh = 45;
+		float gw = 45;
+		float gh = 35;
+		float radiusPlayers = 1.0f;
+		float radiusBall = 0.3f;
 		{
 			BodyDef bd = new BodyDef();
 			bd.position.set(0, 0);
@@ -106,7 +125,7 @@ public class Game implements ApplicationListener {
 		
 		{
 			CircleShape shape = new CircleShape();
-			shape.setRadius(0.3f);
+			shape.setRadius(radiusPlayers);
 
 			FixtureDef fd = new FixtureDef();
 			fd.shape = shape;
@@ -114,7 +133,7 @@ public class Game implements ApplicationListener {
 			fd.friction = 0.5f;
 			fd.restitution = 1.0f;
 
-			for (int i = 0; i < 100; i++) {
+			for (int i = 0; i < 10; i++) {
 				BodyDef bd = new BodyDef();
 				bd.type = BodyType.DynamicBody;
 				bd.position.set(MathUtils.random(-gw,+gw), MathUtils.random(-gh,+gh));
@@ -124,7 +143,31 @@ public class Game implements ApplicationListener {
 				
 				Body body = world.createBody(bd);
 				body.createFixture(fd);
+				players.add(body);
 			}
+			shape.dispose();
+	  }
+			
+		{
+			BodyDef bd = new BodyDef();
+			bd.type = BodyType.DynamicBody;
+			bd.position.set(MathUtils.random(-gw,+gw), MathUtils.random(-gh,+gh));
+			bd.linearVelocity.set(MathUtils.random(10.0f), MathUtils.random(10.0f));
+			bd.angle = MathUtils.PI2 * MathUtils.random(1.0f);
+			bd.angularVelocity = MathUtils.random(1.0f);
+			
+			CircleShape shape = new CircleShape();
+			shape.setRadius(radiusBall);
+
+			FixtureDef fd = new FixtureDef();
+			fd.shape = shape;
+			fd.density = 0.2f;
+			fd.friction = 1.0f;
+			fd.restitution = 1.0f;
+
+			ball = world.createBody(bd);
+			ball.createFixture(fd);
+			shape.dispose();
 	  }
 	}
 	
