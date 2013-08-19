@@ -41,20 +41,42 @@ public class Game implements ApplicationListener {
 	
   String debugMsg = "";
 
+	private static final float DEGTORAD = MathUtils.PI2 / 360;
+
 
 	@Override
 	public void render () {
 		
 		float acc = 1000f;
 		float maxvel = 5f;
+		float maxangacc = 10f;	
 		Vector2 ballPos = ball.getPosition();
 		for (Body player: players) {
 			Vector2 playerPos = player.getPosition();
-			Vector2 delta = ballPos.sub(playerPos).clamp(acc, acc);
-			player.applyForceToCenter(delta, true);
+			Vector2 delta = ballPos.cpy().sub(playerPos);
+			/*
+			player.applyForceToCenter(delta.clamp(acc, acc), true);
 			Vector2 vel = player.getLinearVelocity();
 			if (vel.len() > maxvel) {
 				player.setLinearVelocity(vel.nor().scl(maxvel));
+			}
+			*/
+			float curAngle = player.getAngle();
+			float desAngle = MathUtils.atan2(delta.y, delta.x);  //delta.angle();
+			//player.setTransform(player.getPosition(), desAngle);
+			float totalRotation = desAngle - curAngle;
+			while ( totalRotation < -MathUtils.PI ) { totalRotation += MathUtils.PI2; }
+			while ( totalRotation >  MathUtils.PI ) { totalRotation -= MathUtils.PI2; }
+			float v = player.getAngularVelocity();
+			float I = player.getInertia();
+			float remaining = 0.5f * v * v * I * I / maxangacc;
+			//player.applyTorque(totalRotation < 0 ? -10 : 10, true);
+			if (Math.abs(totalRotation) > remaining) {
+				if (v > 0) player.applyTorque(+maxangacc/I, true);
+				else                   player.applyTorque(-maxangacc/I, true);
+			} else {
+				if (v > 0) player.applyTorque(-maxangacc/I, true);
+				else                   player.applyTorque(+maxangacc/I, true);
 			}
 		}
 		
@@ -84,7 +106,7 @@ public class Game implements ApplicationListener {
 		renderer = new Box2DDebugRenderer();
 
 		// create the world
-		world = new World(new Vector2(0, -10), true);
+		world = new World(new Vector2(0, 0), true);
 		createWorld(world);
 
 		batch = new SpriteBatch();
@@ -92,12 +114,13 @@ public class Game implements ApplicationListener {
 	}
 	
   void createWorld (World world) {
-		world.setGravity(new Vector2(0, 0));
 		
 		float gw = 45;
 		float gh = 35;
 		float radiusPlayers = 1.0f;
 		float radiusBall = 0.3f;
+		float speedPlayers = 1.0f;
+		float speedBall = 50.0f;
 		{
 			BodyDef bd = new BodyDef();
 			bd.position.set(0, 0);
@@ -124,6 +147,7 @@ public class Game implements ApplicationListener {
 		}
 		
 		{
+			// create players
 			CircleShape shape = new CircleShape();
 			shape.setRadius(radiusPlayers);
 
@@ -137,9 +161,10 @@ public class Game implements ApplicationListener {
 				BodyDef bd = new BodyDef();
 				bd.type = BodyType.DynamicBody;
 				bd.position.set(MathUtils.random(-gw,+gw), MathUtils.random(-gh,+gh));
-				bd.linearVelocity.set(MathUtils.random(10.0f), MathUtils.random(10.0f));
+				bd.linearVelocity.set(MathUtils.random(speedPlayers), MathUtils.random(speedPlayers));
         bd.angle = MathUtils.PI2 * MathUtils.random(1.0f);
 				bd.angularVelocity = MathUtils.random(1.0f);
+				bd.linearDamping = 0.1f;
 				
 				Body body = world.createBody(bd);
 				body.createFixture(fd);
@@ -149,10 +174,11 @@ public class Game implements ApplicationListener {
 	  }
 			
 		{
+			// create ball
 			BodyDef bd = new BodyDef();
 			bd.type = BodyType.DynamicBody;
 			bd.position.set(MathUtils.random(-gw,+gw), MathUtils.random(-gh,+gh));
-			bd.linearVelocity.set(MathUtils.random(10.0f), MathUtils.random(10.0f));
+			bd.linearVelocity.set(MathUtils.random(speedBall), MathUtils.random(speedBall));
 			bd.angle = MathUtils.PI2 * MathUtils.random(1.0f);
 			bd.angularVelocity = MathUtils.random(1.0f);
 			
@@ -195,7 +221,7 @@ public class Game implements ApplicationListener {
 		if (aspect > 1) {
 	  	camera = new OrthographicCamera(100*aspect, 100);
 	  } else {
-	  	camera = new OrthographicCamera(100, 100*aspect);
+	  	camera = new OrthographicCamera(100, 100/aspect);
 	  }
 		//camera.position.set(0, 0, 0);
 		//camera = new OrthographicCamera(100, 100);
